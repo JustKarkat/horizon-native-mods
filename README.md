@@ -17,7 +17,7 @@ python3 tools/package.py   # writes target/colored_hearts-1.0.0.hnmod
 
 The first build downloads Rust and compiles the game (20 to 30 minutes; later
 builds are faster). The mod pins the commit that carries the
-native-health-HUD hook point (`83e8e0ba`, Horizon PR #4600) — see
+native-health-HUD hook point (`31054f52`, Horizon PR #4600) — see
 `compatibility.json`.
 
 ## Use
@@ -41,7 +41,7 @@ A horizon-mixins bundle (see `mixins/colored_hearts/horizon-mixin.toml`):
 - `bake_mod.rs` + a HEAD hook on `HudAtlas::slots` — one tinted slot per
   heart-sprite variant and configured color, packed with everything else.
 - `layout.rs` — the answer to Horizon's `native_health_hud` hook point
-  (API 14, PR #4600): Horizon's own layout drawing one colored row of ten,
+  (API 21, PR #4600): Horizon's own layout drawing one colored row of ten,
   heights and food and air and armour as Horizon draws them. Nothing answered
   draws Horizon's own.
 - `palette.rs` + a HEAD hook on `UiResources::load` — the current palette and

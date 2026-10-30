@@ -4,9 +4,10 @@ version = "1.0.0"
 priority = 100
 
 [compatibility]
-# The native-health-HUD hook point's commit (horizon-rust/horizon#4600). The
-# hook is API 14; this pin moves to the merged commit when the PR lands.
-horizon_revision = "83e8e0ba1f9a88588e514e8d0f63d04efadda74f"
+# The native-health-HUD hook point's commit (horizon-rust/horizon#4600,
+# merged state; the hook is API 21 there — main consumed APIs 14 to 20
+# while the PR was up).
+horizon_revision = "31054f520e2258a71440f4e9ea1dd34a5cdca8e5"
 
 # The support module in the render crate: the recolor logic, the palette and
 # the mod's switch. `pub`, because the client-side runtime sets the palette
