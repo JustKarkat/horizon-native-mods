@@ -1,0 +1,118 @@
+[mod]
+id = "colored_hearts"
+version = "1.0.0"
+priority = 100
+
+[compatibility]
+# The native-health-HUD hook point's commit (horizon-rust/horizon#4600). The
+# hook is API 14; this pin moves to the merged commit when the PR lands.
+horizon_revision = "83e8e0ba1f9a88588e514e8d0f63d04efadda74f"
+
+# The support module in the render crate: the recolor logic, the palette and
+# the mod's switch. `pub`, because the client-side runtime sets the palette
+# and the switch, and the render-side modules read them.
+[[module]]
+id = "hearts"
+file = "crates/horizon-client-render/src/lib.rs"
+name = "official_colored_hearts"
+source = "hearts.rs"
+visibility = "pub"
+
+# The atlas bake: injected into hud.rs so it sees the packed images'
+# `PackedImage` alias, and hooked where the atlas reserves its run-time
+# slots — the one place every packed sprite is final, before the atlas
+# layout runs.
+[[module]]
+id = "bake"
+file = "crates/horizon-client-render/src/hud.rs"
+name = "official_colored_hearts_bake"
+source = "bake_mod.rs"
+
+# The colored rows: injected into hud_layout.rs so the answer can use the
+# crate's own sprite helpers, and `pub` because the client-side glue calls
+# it.
+[[module]]
+id = "hearts-layout"
+file = "crates/horizon-client-render/src/hud_layout.rs"
+name = "official_colored_hearts_layout"
+source = "layout.rs"
+visibility = "pub"
+
+# The mod's settings and its Options > Mods page, plus the game-side glue
+# the hook helper calls. Client side, where the Game, the mod's data folder
+# and the game's helpers live.
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "official_colored_hearts_mod"
+source = "runtime.rs"
+visibility = "pub"
+
+[[module]]
+id = "hud-glue"
+file = "crates/horizon-client/src/game.rs"
+name = "official_colored_hearts_hud"
+source = "hud_glue.rs"
+
+# Every atlas build (menu and world bundles, pack switches) gets the current
+# palette first, so the baked slots are always there and turning the mod on
+# needs no restart.
+[[injection]]
+id = "palette"
+kind = "HEAD"
+target = "horizon_client::game::UiResources::load"
+helper = "palette.rs"
+
+[[injection]]
+id = "bake-sprites"
+kind = "HEAD"
+target = "horizon_client_render::hud::HudAtlas::slots"
+helper = "bake.rs"
+bindings = [
+  { name = "images", ty = "&mut Vec<PackedImage>", value = "&mut *images" },
+]
+
+# The colored rows: the native-health-HUD hook point. The mod answers with
+# its one tinted row of ten when it is on; nothing set draws Horizon's own.
+[[injection]]
+id = "colored-health-hud"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_health_hud"
+helper = "health_hud.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "inputs", ty = "&horizon_client::hud_layout::HealthInputs", value = "inputs" },
+  { name = "wi", ty = "i32", value = "wi" },
+  { name = "hi", ty = "i32", value = "hi" },
+  { name = "draws", ty = "&mut Option<Vec<horizon_client::hud_layout::GuiDraw>>", value = "&mut *draws" },
+]
+
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
+
+[[injection]]
+id = "settings"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings"
+helper = "settings.rs"
+bindings = [
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "buttons", ty = "&mut Vec<String>", value = "&mut *buttons" },
+]
+
+[[injection]]
+id = "click"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings_click"
+helper = "click.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "button", ty = "usize", value = "button" },
+]

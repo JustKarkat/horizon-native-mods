@@ -1,30 +1,23 @@
 # Validation
 
-Validated on Linux with Rust 1.95.0 on 2026-10-30, using the exact revisions in
-`compatibility.json` and the real bundle committed here.
+Validated on Linux (CachyOS, Rust 1.95.0 and 1.99.1) on 2026-10-30, using the
+exact revisions in `compatibility.json` (the native-health-HUD hook point's
+commit, PR #4600 — repin to the merged commit when it lands), a Horizon clone
+holding that commit, and the real bundle committed here.
 
 | Check | Result |
 |---|---|
 | `cargo fmt --all --check` | Pass |
 | `cargo clippy --workspace --all-targets --locked --offline -- -D warnings` | Pass |
 | `cargo test --workspace --locked --offline` | Runtime unit test passes |
-| `python3 tools/test_template.py` | Actual bundle compiles in the tiny fixture; original method calls/result, shared runtime, AST audit, unchanged bytes/mtimes and incompatible revision/target rejection pass |
-| `python3 tools/test_stage.py` | Complete pinned Horizon export stages deterministically; original checkout unchanged; exact HEAD/module audit passes |
-| `python3 tools/horizon.py check` | Actual `horizon-client` binary checks successfully with `--no-default-features` |
-| `python3 tools/horizon.py test` | The runtime's embedded test passes inside the actual Horizon game test binary |
+| `python3 tools/test_bundle.py` | Manifest/pin agreement; packaging deterministic (same SHA-256 twice) |
+| `python3 tools/test_stage.py` | Complete pinned Horizon export stages deterministically; original checkout unchanged; all six HEAD helpers and five support modules match the plan; every other AST pristine |
+| `python3 tools/horizon.py check` | The actual `horizon-client` binary checks successfully with `--no-default-features` |
+| `python3 tools/horizon.py test` | The runtime's test passes inside the game's test binary, and the 5 colored-layout tests pass in the render crate's tests |
 
-The native check reported 69.55 seconds in Cargo, and the native test passed.
-Both reused an existing external Cargo target directory with cached
-Horizon dependencies. These are compilation/test checks, not a fresh-build
-benchmark. Staging the full export took about 24 seconds per command on this
-machine; a repeated application preserved the stage.
-
-No game was launched and no Minecraft resources or player data were read or
-changed. Interactive logging/gameplay remains a manual check with the compatible
-prepared resources. The source audit verifies only the declared HEAD statement
-and support module differ from pristine Rust ASTs; it does not claim compatibility
-with other Horizon revisions or arbitrary third-party mods.
-
-CI reproduces the formatting, clippy, standalone runtime and tiny-fixture tests.
-The full native checks additionally need a Horizon Git history containing the
-pin and its cached dependencies; use the commands in README.md to reproduce them.
+Staging the full export took about 28 seconds per command. No game was
+launched and no Minecraft resources or player data were read or changed
+beyond the staging export. The on-screen rows are a manual check with the
+compatible prepared resources; they carry the extras' proof (PR #3455's
+120/120 HUD parity and screenshots) — same positions, same colors, same
+deterministic expansion.

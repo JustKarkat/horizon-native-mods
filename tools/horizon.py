@@ -24,6 +24,17 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def snapshot(root):
+    return {str(p.relative_to(root)): (digest(p.read_bytes()), p.stat().st_mtime_ns)
+            for p in root.rglob('*') if p.is_file()}
+
+
+def audit(original, stage, plan):
+    subprocess.run(["cargo", "run", "--quiet", "--locked", "--offline", "-p",
+                    "native-mod-source-audit", "--", str(original), str(stage), str(plan)],
+                   cwd=ROOT, check=True)
+
+
 def stage(horizon, stages):
     if not (horizon / ".git").exists():
         raise ValueError("--horizon must be a Git checkout (including a worktree)")
@@ -123,17 +134,33 @@ def main():
             if args.action == "build":
                 command.extend(["--profile", "fast"])
             if args.action == "test":
-                command.extend(["game::example_mod::tests", "--", "--nocapture"])
+                command.extend(["official_colored_hearts", "--", "--nocapture"])
             with lock(target.parent / (target.name + ".mod-template.lock")):
                 run_start = time.monotonic()
                 result = subprocess.run(command, cwd=output, capture_output=True, text=True)
+                # The colored rows' tests live in the render crate's lib,
+                # not the client bin.
+                render_result = None
+                if args.action == "test" and not result.returncode:
+                    render_command = ["cargo", "test", "--locked", "--offline",
+                                      "-p", "horizon-client-render", "--lib",
+                                      "official_colored_hearts_layout", "--target-dir",
+                                      str(target), "--", "--nocapture"]
+                    render_result = subprocess.run(render_command, cwd=output,
+                                                   capture_output=True, text=True)
             report.update(cargo_seconds=time.monotonic()-run_start, cargo_command=command,
                           cargo_exit=result.returncode)
             log = ROOT / "target" / f"horizon-{args.action}.log"
             log.write_text(result.stdout + result.stderr)
+            if render_result is not None:
+                with log.open("a") as handle:
+                    handle.write("\n===== render crate tests =====\n"
+                                 + render_result.stdout + render_result.stderr)
+                report["render_cargo_exit"] = render_result.returncode
             report["cargo_log"] = str(log)
-            if result.returncode:
-                print(result.stderr[-12000:], file=sys.stderr)
+            failing = render_result if (render_result is not None and render_result.returncode) else result
+            if failing.returncode:
+                print(failing.stderr[-12000:], file=sys.stderr)
                 print(json.dumps(report), file=sys.stderr)
                 return result.returncode
             if args.action == "build":

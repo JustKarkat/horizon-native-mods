@@ -1,14 +1,14 @@
 [package]
-name = "horizon-example-mod"
-version = "0.1.0"
+name = "horizon-mod-colored-hearts"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
-description = "A minimal native Horizon Mixins mod"
+description = "A native Horizon mod: past ten hearts, the HUD's heart row tints one color per row of ten"
 
 [lib]
 # This exact source is also injected as a same-crate module by horizon-mixins.
-path = "mixins/example_mod/runtime.rs"
+path = "mixins/colored_hearts/runtime.rs"
 
 [workspace]
 members = ["tools/audit"]

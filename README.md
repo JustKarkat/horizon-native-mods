@@ -1,150 +1,52 @@
-# Horizon native mod template
+# Colored Hearts — a native Horizon mod
 
-A minimal **horizon-mixins** mod template based on
-[Horizon Veinminer](https://github.com/levzzz5154/horizon-veinminer).
-It declares one HEAD hook that logs a block-break attempt, then lets Horizon's
-original method run unchanged. Runtime logic lives in one Rust file that also
-builds as a standalone testable Cargo library.
+Past ten hearts, the HUD's heart row tints one color per row of ten — health
+first, then absorption with its own colors — instead of adding rows. Horizon's
+own `coloredHearts` extra, moved out of the game as a native mod. Off by
+default; the colors are `#RRGGBB` lists in the mod's data files, with the
+vanilla red and gold first when unset.
 
-This is the native source-mixin path: it builds a custom Horizon executable.
-For sandboxed `.hmod`/Wasm API mods, use Horizon's `cargo horizon-mod new`
-instead. This template does not install into a running game or the launcher's
-ordinary `.hmod` folder.
+## Install
 
-## Start a mod
-
-Use GitHub's **Use this template → Create a new repository**, then clone your
-new repository. Requirements: Linux, Rust 1.95.0, Python 3.12+, Git and Cargo.
-The staging script uses Linux file locks; Windows/macOS are not validated.
+Package the bundle and install it from the launcher's Mods page (or unpack the
+`.hnmod` and run `horizon-launcher native-build <folder> --trust-native-code`):
 
 ```sh
-cargo fetch --locked
-cargo test --workspace --locked --offline
+python3 tools/package.py   # writes target/colored_hearts-1.0.0.hnmod
 ```
 
-The exact compatible revisions are in [compatibility.json](compatibility.json):
+The first build downloads Rust and compiles the game (20 to 30 minutes; later
+builds are faster). The mod pins the commit that carries the
+native-health-HUD hook point (`83e8e0ba`, Horizon PR #4600) — see
+`compatibility.json`.
 
-- Horizon: `ba6344a59cb9e755b730dcf02285fc0d33b97d3c` (Nightly 2026-10-30).
-- Horizon Mixins: `d9c83d7` (0.6.0, plan schema 6).
+## Use
 
-Clone the tools beside your mod if you do not already have suitable checkouts:
+- **Options → Mods → Colored Hearts → Colored** turns the tint on and off.
+- `healthColors` / `absorptionColors` in the mod's data folder
+  (`horizon-mods/.horizon-mod-data/colored_hearts/`) are `#RRGGBB` lists (up
+  to 32). Past the list the rows repeat it, each pass one step lighter then
+  darker, growing — deterministic, so a 900-heart player climbs the same
+  colors every time.
+- The tinted sprites are baked into the HUD atlas at every build, so turning
+  the mod on needs no restart, and a resource pack's own heart sprites
+  recolor too (flat single-tone sprites are left alone).
 
-```sh
-git clone https://github.com/horizon-rust/horizon ../horizon
-git clone https://github.com/horizon-rust/horizon-mixins ../horizon-mixins
-git -C ../horizon-mixins checkout "$(python3 -c 'import json; print(json.load(open("compatibility.json"))["horizon_mixins_revision"])')"
-cargo fetch --locked --manifest-path ../horizon-mixins/Cargo.toml
-```
+## How it works
 
-Horizon can stay on its existing branch: staging exports the committed pin with
-`git archive` and never checks out or edits the original source. Its Git history
-must contain the pinned commit. A shallow clone may need a fetch first.
-The Mixins checkout must be at the exact recorded revision with clean tracked
-engine sources. For an existing development checkout at another revision, use
-a separate clone/worktree and set `HORIZON_MIXINS=/path/to/pinned/horizon-mixins`.
+A horizon-mixins bundle (see `mixins/colored_hearts/horizon-mixin.toml`):
 
-## Layout and customization
-
-```text
-Cargo.toml                         Standalone runtime library + source audit workspace
-compatibility.json                 Exact upstream/tool revisions and source hashes
-mixins/example_mod/
-  horizon-mixin.toml                Module and HEAD declaration
-  break.rs                         Small typed hook adapter
-  runtime.rs                       Runtime implementation and unit tests (single source)
-tools/horizon.py                   Export → plan → apply → check/build/test
-tools/test_template.py             Tiny compiled fixture; no Horizon checkout/assets needed
-tools/test_stage.py                Real pinned source audit and repeatability test
-tools/audit/                      Rust AST comparison against the pristine export
-```
-
-To rename the example:
-
-1. Change Cargo package name/description and the manifest's mod ID/version.
-2. Rename `mixins/example_mod/` and update the Cargo `[lib].path`.
-3. Change the manifest module name `example_mod` and its reference in `break.rs`.
-4. Change the runtime log prefix, unit-test expectation and the native test filter
-   `game::example_mod::tests` in `tools/horizon.py`.
-5. Run `cargo generate-lockfile --offline` after renaming the Cargo package and
-   run the checks below.
-
-Add behavior to `runtime.rs`, then expose it through small typed helpers and
-TOML declarations. No payload generation is necessary: Cargo and the injected
-module read the same file. Module payloads cannot use inner file attributes
-(including `//!` comments), external `mod` files or `include!`; use ordinary
-comments and inline modules. Hooks compile in their target's crate/module, so
-native-specific imports can be placed in the helper. To keep runtime tests
-standalone, use ordinary Rust types or a small host interface there.
-
-This example passes only `pos`. To access the native game, declare an explicit
-helper binding for `&mut crate::game::Game<'_>` with value `&mut *self`, as
-Veinminer does. Existing crate dependencies/privacy/borrowing remain enforced;
-Cargo dependencies from this template are not automatically injected into Horizon.
-See [Mixin contracts](https://github.com/horizon-rust/horizon-mixins/blob/main/README.md)
-and [effects/state](https://github.com/horizon-rust/horizon-mixins/blob/main/docs/effects-and-state.md)
-for cancellation, captures, value changes, bridges and state.
-
-## Stage, compile and run
-
-```sh
-python3 tools/horizon.py stage --horizon ../horizon
-```
-
-This prints the generated stage path. It uses only committed pinned sources,
-records original hashes, runs the real Mixins `plan`/`apply` CLI, and preserves
-unchanged bytes/mtimes on repeated runs. The original checkout and player data
-stay untouched. The plan is saved at `target/mixins/plan.json`.
-
-If Horizon dependencies are not cached, fetch the staged lockfile once:
-
-```sh
-cargo fetch --locked --manifest-path target/mixins/modded/Cargo.toml
-python3 tools/horizon.py check --horizon ../horizon
-python3 tools/horizon.py test --horizon ../horizon
-python3 tools/horizon.py build --horizon ../horizon
-```
-
-`check` checks the actual client binary. `test` compiles it and runs the embedded
-runtime test module. `build` uses Horizon's `fast` profile and
-`--no-default-features` (audio/controllers disabled), and prints its binary path.
-These commands use offline, locked builds; raw logs are in `target/horizon-*.log`.
-`--target-dir PATH` selects a reusable external Cargo target directory.
-
-Launch the built client with your own **prepared resources for the pinned
-Horizon version**, and explicitly pass their path:
-
-```sh
-./target/horizon-cargo/fast/horizon-client --resources /absolute/path/to/prepared/resources
-```
-
-Prepare those resources using the compatible Horizon launcher or
-`horizon-prepare --prepare`; game resources are not supplied by this repository.
-Use the binary's `--help` for world/server arguments. Breaking a block should
-print `[example_mod] Breaking block at ...` to the host's stderr. The HEAD log
-reports attempts, including attempts the original game later rejects.
-Compilation tests do not establish interactive gameplay/resource compatibility.
-
-## Pin to a Nightly, package, publish
-
-A native mod builds on one exact Horizon commit, and every mod of a player's build must pin the same one, so
-pin a **Nightly**: its release notes name the commit, and the tag `nightly-source/<date>-<short>` keeps that
-commit's source downloadable after the Nightly is replaced. This template pins Nightly 2026-10-30
-(`ba6344a`). The launcher also builds every mod of a build with one horizon-mixins revision, the one
-they all name (`horizon_mixins_revision`), so keep it the same as the other mods your players combine yours with.
-To move to a newer Nightly:
-
-1. Put its commit in `compatibility.json` (`horizon_revision`) and in the manifest's
-   `[compatibility] horizon_revision`.
-2. Update `source_sha256` for each target file (`git -C ../horizon show <commit>:<path> | sha256sum`).
-3. Run the checks below. When a target moved (the game is being split into crates), `plan` names the
-   missing function: find its new path in that commit and fix `target` in the manifest.
-
-Then `python3 tools/package.py` writes `target/<id>-<version>.hnmod`: `horizon-native.json` plus your
-`mixins/<id>/` sources, byte-for-byte reproducible. Submit it to
-[horizon-mods](https://github.com/horizon-rust/horizon-mods) as a `native-mod`. A maintainer reads the
-source before it is listed, and the Horizon launcher compiles it with its own Rust on the pinned commit, in
-an instance of its own. The mod id must be lowercase letters, digits and `_` (the registry's rule), and
-the bundle folder is named after it.
+- `hearts.rs` — the recolor logic, palette and switch: a `pub` support module
+  in the render crate.
+- `bake_mod.rs` + a HEAD hook on `HudAtlas::slots` — one tinted slot per
+  heart-sprite variant and configured color, packed with everything else.
+- `layout.rs` — the answer to Horizon's `native_health_hud` hook point
+  (API 14, PR #4600): Horizon's own layout drawing one colored row of ten,
+  heights and food and air and armour as Horizon draws them. Nothing answered
+  draws Horizon's own.
+- `palette.rs` + a HEAD hook on `UiResources::load` — the current palette and
+  switch before every atlas build.
+- The usual Options → Mods hooks list the mod and keep its settings.
 
 ## Validation
 
@@ -152,22 +54,14 @@ the bundle folder is named after it.
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked --offline -- -D warnings
 cargo test --workspace --locked --offline
-python3 tools/test_template.py
+python3 tools/test_bundle.py
 # With a Horizon Git clone containing the pin:
-python3 tools/test_stage.py --horizon ../horizon
-python3 tools/horizon.py check --horizon ../horizon
-python3 tools/horizon.py test --horizon ../horizon
+python3 tools/test_stage.py --horizon ../horizon-work-hooks
+python3 tools/horizon.py check --horizon ../horizon-work-hooks
+python3 tools/horizon.py test --horizon ../horizon-work-hooks
 ```
 
-The tiny fixture compiles the actual bundle, checks the original body executes
-once with its result preserved, runs the shared runtime unit test, and verifies
-repeated source bytes/mtimes. Wrong revisions and missing targets fail before
-replacing the stage. The Rust audit checks the exact generated HEAD/helper and
-module, removes only those planned additions, then compares the remaining AST
-with pristine source. The same audit runs on a complete pinned Horizon export.
-CI runs the standalone checks and tiny fixture; the full native checks require
-the larger cached Horizon dependency set. See [VALIDATION.md](VALIDATION.md).
-
-Build/staging tooling is adapted from the MIT-licensed Veinminer port. This
-repository includes no Veinminer gameplay, Minecraft assets, game binaries or
-exported Horizon sources. License: [MIT](LICENSE).
+Results: see [VALIDATION.md](VALIDATION.md). The on-screen behavior is the
+extras' proven behavior (the 10-29 proof on Horizon PR #3455: 120/120 HUD
+parity with the extra off, screenshots on with it); the layout code is the
+same, re-based on the hook point.
