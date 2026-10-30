@@ -24,6 +24,17 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def snapshot(root):
+    return {str(p.relative_to(root)): (digest(p.read_bytes()), p.stat().st_mtime_ns)
+            for p in root.rglob('*') if p.is_file()}
+
+
+def audit(original, stage, plan):
+    subprocess.run(["cargo", "run", "--quiet", "--locked", "--offline", "-p",
+                    "native-mod-source-audit", "--", str(original), str(stage), str(plan)],
+                   cwd=ROOT, check=True)
+
+
 def stage(horizon, stages):
     if not (horizon / ".git").exists():
         raise ValueError("--horizon must be a Git checkout (including a worktree)")
@@ -123,7 +134,7 @@ def main():
             if args.action == "build":
                 command.extend(["--profile", "fast"])
             if args.action == "test":
-                command.extend(["game::example_mod::tests", "--", "--nocapture"])
+                command.extend(["official_target_details", "--", "--nocapture"])
             with lock(target.parent / (target.name + ".mod-template.lock")):
                 run_start = time.monotonic()
                 result = subprocess.run(command, cwd=output, capture_output=True, text=True)

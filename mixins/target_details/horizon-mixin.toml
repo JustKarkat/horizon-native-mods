@@ -1,0 +1,72 @@
+[mod]
+id = "target_details"
+version = "1.0.0"
+priority = 100
+
+[compatibility]
+horizon_revision = "ba6344a59cb9e755b730dcf02285fc0d33b97d3c"
+
+# The mod's logic and settings: pure, and the standalone Cargo library's
+# tests. `pub`, because the glue module and the hooks read it.
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "official_target_details"
+source = "runtime.rs"
+visibility = "pub"
+
+# The game-facing draw: reads the crosshair's target through the game's own
+# pick, builds the readout and paints it. Injected into game.rs, where the
+# Game fields and helpers are in scope.
+[[module]]
+id = "glue"
+file = "crates/horizon-client/src/game.rs"
+name = "official_target_details_glue"
+source = "glue.rs"
+
+# Runs when Horizon's selected item name has drawn: the readout sits above
+# the hotbar, stacked over it like the extra did. The target is
+# `draw_selected_name` because it is the game's own call with the batch and
+# the bar height in scope; spectators pass it by, and see no readout.
+[[injection]]
+id = "readout"
+kind = "RETURN"
+target = "horizon_client::game::titles::Game<'_>::draw_selected_name"
+helper = "after_selected_name.rs"
+bindings = [
+  { name = "value", ty = "()", value = "$value" },
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+  { name = "bar_height", ty = "i32", value = "bar_height" },
+]
+
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
+
+[[injection]]
+id = "settings"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings"
+helper = "settings.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "buttons", ty = "&mut Vec<String>", value = "&mut *buttons" },
+]
+
+[[injection]]
+id = "click"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings_click"
+helper = "click.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "button", ty = "usize", value = "button" },
+]
